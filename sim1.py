@@ -37,11 +37,36 @@ class Receiver:
         self.received_signal = np.zeros(nt * max_periods)
         self.current_period = 0
         self.total_frame_count = 0
+        self.envelope = None
 
     def record_signal(self, u_curr, current_frame):
         """记录接收点的信号"""
         signal_index = self.current_period * self.nt + current_frame
         self.received_signal[signal_index] = u_curr[self.receiver_pos]
+
+    def get_envelope(self):
+        """使用Hilbert变换计算信号包络"""
+        from scipy.signal import hilbert
+        analytic_signal = hilbert(self.received_signal)
+        self.envelope = np.abs(analytic_signal)
+        return self.envelope
+
+    def analyze_impedance(self):
+        """分析声阻抗变化"""
+        if self.envelope is None:
+            self.get_envelope()
+        
+        # 找到包络的峰值
+        from scipy.signal import find_peaks
+        peaks, _ = find_peaks(self.envelope, height=0.1)
+        
+        # 计算峰值对应的时间和位置
+        time_axis = np.linspace(0, len(self.received_signal) * self.parameter.dx / self.parameter.base_speed, len(self.received_signal))
+        peak_times = time_axis[peaks]
+        peak_positions = peak_times * self.parameter.base_speed
+        peak_amplitudes = self.envelope[peaks]
+        
+        return peak_positions, peak_amplitudes
 
 class Simulator:
     def __init__(self, parameter):
@@ -133,9 +158,10 @@ class Display:
 
         # 接收信号图
         self.line_received, = self.ax3.plot([], [], 'g-', label='Received Signal')
+        self.line_envelope, = self.ax3.plot([], [], 'r--', label='Signal Envelope')
         self.ax3.set_xlabel('Time (μs)')
         self.ax3.set_ylabel('Amplitude')
-        self.ax3.set_title('Received Signal at x = 0.01m')
+        self.ax3.set_title('Received Signal and Envelope')
         self.ax3.grid(True)
         self.ax3.legend()
 
@@ -163,20 +189,31 @@ class Display:
         time_axis = np.linspace(0, valid_frames*self.simulation.dt*1e6, valid_frames)
         self.line_received.set_data(time_axis, 
                                    self.receiver.received_signal[:valid_frames])
+        
+        # 更新包络
+        envelope = self.receiver.get_envelope()
+        self.line_envelope.set_data(time_axis, envelope[:valid_frames])
+        
+        # 分析声阻抗变化
+        if self.receiver.total_frame_count % self.simulation.nt == 0:
+            positions, amplitudes = self.receiver.analyze_impedance()
+            print("\n声阻抗变化位置 (m):", positions)
+            print("相对幅度:", amplitudes)
+        
         self.ax3.set_xlim(0, self.receiver.max_periods * self.simulation.t_end*1e6)
         self.ax3.set_ylim(-1.5, 1.5)
         
-        return self.line, self.line_received
+        return self.line, self.line_received, self.line_envelope
 
 def main():
     # 创建声阻抗分布对象
     parameter = Parameter(length=0.05, nx=1500)
-    parameter.add_region(start_pos=0.01, end_pos=0.03, ratio=0.6)
+    parameter.add_region(start_pos=0.01, end_pos=0.02, ratio=0.6)
+    # parameter.add_region(start_pos=0.02, end_pos=0.025, ratio=0.8)
 
     # 创建仿真对象
     simulation = Simulator(parameter)
 
-    # 创建信号处理器，接收器位置设置为0.01米
     receiver = Receiver(simulation.nt, max_periods=5, receiver_pos=0.0, parameter=parameter)
 
     # 创建可视化对象

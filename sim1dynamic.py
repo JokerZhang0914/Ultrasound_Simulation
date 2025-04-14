@@ -37,11 +37,19 @@ class Receiver:
         self.received_signal = np.zeros(nt * max_periods)
         self.current_period = 0
         self.total_frame_count = 0
+        self.envelope = None
 
     def record_signal(self, u_curr, current_frame):
         """记录接收点的信号"""
         signal_index = self.current_period * self.nt + current_frame
         self.received_signal[signal_index] = u_curr[self.receiver_pos]
+
+    def get_envelope(self):
+        """使用Hilbert变换计算信号包络"""
+        from scipy.signal import hilbert
+        analytic_signal = hilbert(self.received_signal)
+        self.envelope = np.abs(analytic_signal)
+        return self.envelope
 
 class Simulator:
     def __init__(self, parameter):
@@ -133,9 +141,10 @@ class Display:
 
         # 接收信号图
         self.line_received, = self.ax3.plot([], [], 'g-', label='Received Signal')
+        self.line_envelope, = self.ax3.plot([], [], 'r--', label='Signal Envelope')
         self.ax3.set_xlabel('Time (μs)')
         self.ax3.set_ylabel('Amplitude')
-        self.ax3.set_title('Received Signal at x = 0.01m')
+        self.ax3.set_title('Received Signal and Envelope')
         self.ax3.grid(True)
         self.ax3.legend()
 
@@ -163,10 +172,14 @@ class Display:
         time_axis = np.linspace(0, valid_frames*self.simulation.dt*1e6, valid_frames)
         self.line_received.set_data(time_axis, 
                                    self.receiver.received_signal[:valid_frames])
+        # 更新包络
+        envelope = self.receiver.get_envelope()
+        self.line_envelope.set_data(time_axis, envelope[:valid_frames])
+        
         self.ax3.set_xlim(0, self.receiver.max_periods * self.simulation.t_end*1e6)
         self.ax3.set_ylim(-1.5, 1.5)
         
-        return self.line, self.line_received
+        return self.line, self.line_received, self.line_envelope
 
 def main():
     # 创建声阻抗分布对象
