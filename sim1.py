@@ -1,3 +1,4 @@
+from turtle import end_fill
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -127,13 +128,17 @@ class Simulator:
         self.u_curr[:] = self.u_next
 
 class Display:
-    def __init__(self, simulation, receiver):
+    def __init__(self, simulation, receiver, mode=1):
         self.simulation = simulation
         self.receiver = receiver
-        self.setup_plots()
+        self.mode = mode
+        if mode == 1:
+            self.setup_plots_mode1()
+        else:
+            self.setup_plots_mode2()
 
-    def setup_plots(self):
-        """设置绘图对象"""
+    def setup_plots_mode1(self):
+        """设置模式1的绘图对象（三图显示）"""
         self.fig, (self.ax2, self.ax1, self.ax3) = plt.subplots(3, 1, 
             height_ratios=[0.8, 3, 1], figsize=(10, 12))
         
@@ -205,24 +210,66 @@ class Display:
         
         return self.line, self.line_received, self.line_envelope
 
+    def setup_plots_mode2(self):
+        """设置模式2的绘图对象（接收信号波形）"""
+        # 运行仿真直到60us
+        end_time = int(input("请输入要显示的时间（单位：μs）：")) * 1e-6
+        frames = int(end_time / self.simulation.dt)
+        for frame in range(frames):
+            self.simulation.update(frame)
+            self.receiver.record_signal(self.simulation.u_curr, frame)
+        
+        # 创建图形
+        self.fig, self.ax = plt.subplots(figsize=(10, 6))
+        time_axis = np.linspace(0, frames*self.simulation.dt*1e6, frames)
+        
+        # 绘制接收信号
+        self.ax.plot(time_axis, self.receiver.received_signal[:frames], 'g-', label='Received Signal')
+        
+        # 计算并绘制包络
+        envelope = self.receiver.get_envelope()
+        self.ax.plot(time_axis, envelope[:frames], 'r--', label='Envelope')
+        
+        # 标注峰值
+        from scipy.signal import find_peaks
+        peaks, _ = find_peaks(envelope[:frames], height=0.1)
+        peak_times = time_axis[peaks]
+        peak_values = envelope[peaks]
+        
+        for t, v in zip(peak_times, peak_values):
+            self.ax.annotate(f'{v:.2f}', xy=(t, v), xytext=(0, 10),
+                            textcoords='offset points', ha='center')
+        
+        self.ax.set_xlabel('Time (μs)')
+        self.ax.set_ylabel('Amplitude')
+        self.ax.set_title('Received Signal at 60μs with Envelope')
+        self.ax.grid(True)
+        self.ax.legend()
+        plt.tight_layout()
+
 def main():
     # 创建声阻抗分布对象
     parameter = Parameter(length=0.05, nx=1500)
     parameter.add_region(start_pos=0.01, end_pos=0.02, ratio=0.6)
-    # parameter.add_region(start_pos=0.02, end_pos=0.025, ratio=0.8)
 
     # 创建仿真对象
     simulation = Simulator(parameter)
 
+    # 创建接收器
     receiver = Receiver(simulation.nt, max_periods=5, receiver_pos=0.0, parameter=parameter)
 
+    # 选择显示模式（1：三图动态显示，2：接收信号波形）
+    mode = int(input("请选择显示模式（1：三图动态显示，2：接收信号波形）："))
+    
     # 创建可视化对象
-    display = Display(simulation, receiver)
+    display = Display(simulation, receiver, mode)
 
-    # 创建动画
-    ani = FuncAnimation(display.fig, display.update, 
-                       frames=simulation.nt, interval=0.5, 
-                       blit=True, repeat=True)
+    if mode == 1:
+        # 创建动画
+        ani = FuncAnimation(display.fig, display.update, 
+                           frames=simulation.nt, interval=0.5, 
+                           blit=True, repeat=True)
+    
     plt.show()
 
 if __name__ == '__main__':

@@ -186,6 +186,7 @@ def main():
     parameter = Parameter(length=0.05, nx=1500)
     parameter.add_region(start_pos=0.01, end_pos=0.03, ratio=0.6)
 
+
     # 创建仿真对象
     simulation = Simulator(parameter)
 
@@ -198,7 +199,7 @@ def main():
     # 创建动画
     ani = FuncAnimation(display.fig, display.update, 
                        frames=simulation.nt, interval=0.5, 
-                       blit=True, repeat=True)
+                       blit=True, repeat=False)
     plt.show()
 
 if __name__ == '__main__':
