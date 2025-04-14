@@ -1,4 +1,3 @@
-from turtle import end_fill
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -138,7 +137,7 @@ class Display:
             self.setup_plots_mode2()
 
     def setup_plots_mode1(self):
-        """设置模式1的绘图对象（三图显示）"""
+        """设置模式1的绘图对象（波长与接收动态显示）"""
         self.fig, (self.ax2, self.ax1, self.ax3) = plt.subplots(3, 1, 
             height_ratios=[0.8, 3, 1], figsize=(10, 12))
         
@@ -237,7 +236,7 @@ class Display:
         peak_values = envelope[peaks]
         
         for t, v in zip(peak_times, peak_values):
-            self.ax.annotate(f'{v:.2f}', xy=(t, v), xytext=(0, 10),
+            self.ax.annotate(f't={t:.1f}μs\nv={v:.2f}', xy=(t, v), xytext=(0, 10),
                             textcoords='offset points', ha='center')
         
         self.ax.set_xlabel('Time (μs)')
@@ -258,8 +257,8 @@ def main():
     # 创建接收器
     receiver = Receiver(simulation.nt, max_periods=5, receiver_pos=0.0, parameter=parameter)
 
-    # 选择显示模式（1：三图动态显示，2：接收信号波形）
-    mode = int(input("请选择显示模式（1：三图动态显示，2：接收信号波形）："))
+    # 选择显示模式（1：波长与接收动态显示，2：接收信号包络波形）
+    mode = int(input("请选择显示模式（1：波场与接收动态显示，2：接收信号波形）："))
     
     # 创建可视化对象
     display = Display(simulation, receiver, mode)
