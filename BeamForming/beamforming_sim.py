@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 class ArrayTransducer:
-    def __init__(self, num_elements, element_pitch, element_width):
+    def __init__(self, num_elements, element_pitch, element_width, Lx, Ly):
         self.num_elements = num_elements  # 阵元数量
         self.element_pitch = element_pitch  # 阵元间距
         self.element_width = element_width  # 阵元宽度
+        self.Lx = Lx  # 仿真区域宽度
+        self.Ly = Ly  # 仿真区域高度
         self.positions = np.zeros((num_elements, 2))  # 阵元位置 (x, y)
         self.delays = np.zeros(num_elements)  # 各阵元延迟时间
         self._initialize_positions()
@@ -14,8 +16,8 @@ class ArrayTransducer:
     def _initialize_positions(self):
         """初始化阵元位置"""
         total_width = (self.num_elements - 1) * self.element_pitch
-        start_x = (0.02 - total_width) / 2  # 水平居中
-        y_pos = 0.019  # 距上边界0.001米
+        start_x = (self.Lx - total_width) / 2  # 水平居中
+        y_pos = self.Ly - 0.001  # 距上边界0.001米
         for i in range(self.num_elements):
             self.positions[i] = [start_x + i * self.element_pitch, y_pos]
 
@@ -181,7 +183,9 @@ def main():
     array_transducer = ArrayTransducer(
         num_elements=32,  # 32个阵元
         element_pitch=0.0002,  # 阵元间距0.2mm
-        element_width=0.0001  # 阵元宽度0.1mm
+        element_width=0.0001,  # 阵元宽度0.1mm
+        Lx=parameter.Lx,  # 仿真区域宽度
+        Ly=parameter.Ly  # 仿真区域高度
     )
     
     # 设置聚焦点
