@@ -93,8 +93,8 @@ class Simulator:
         self.source_active = True
         self.source = self._generate_source()
         
-        # 边界条件
-        self.alpha = 0.0
+        # 边界条件参数
+        self.c_max = np.max(self.c)  # 最大声速，用于边界条件计算
 
     def _generate_source(self):
         """生成衰减正弦波声源"""
@@ -111,9 +111,16 @@ class Simulator:
                             self.c[1:-1]**2 * 
                             (self.u_curr[2:] - 2*self.u_curr[1:-1] + self.u_curr[:-2]))
         
-        # 应用吸收边界条件
-        self.u_next[0] = self.u_curr[1]
-        self.u_next[-1] = self.alpha * self.u_curr[-2]
+        # 应用全透射边界条件（一阶Mur边界）
+        # 左边界
+        self.u_next[0] = self.u_curr[1] + \
+                         (self.c_max*self.dt - self.parameter.dx)/(self.c_max*self.dt + self.parameter.dx) * \
+                         (self.u_next[1] - self.u_curr[0])
+        
+        # 右边界
+        self.u_next[-1] = self.u_curr[-2] + \
+                          (self.c_max*self.dt - self.parameter.dx)/(self.c_max*self.dt + self.parameter.dx) * \
+                          (self.u_next[-2] - self.u_curr[-1])
         
         # 施加声源
         if current_frame < len(self.source) and self.source_active:
@@ -212,7 +219,7 @@ class Display:
     def setup_plots_mode2(self):
         """设置模式2的绘图对象（接收信号波形）"""
         # 运行仿真直到60us
-        end_time = int(input("请输入要显示的时间（单位：μs）：")) * 1e-6
+        end_time = int(input("请输入要显示的时间（单位：μs,缺省值60us）：") or "60") * 1e-6
         frames = int(end_time / self.simulation.dt)
         for frame in range(frames):
             self.simulation.update(frame)

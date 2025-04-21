@@ -70,8 +70,8 @@ class Simulator:
         # 获取声源位置列表
         self.sources = parameter.sources
         
-        # 边界条件
-        self.alpha = 0.0
+        # 边界条件参数
+        self.c_max = np.max(self.c)  # 最大声速，用于边界条件计算
 
     def _generate_source(self):
         """生成衰减正弦波声源"""
@@ -89,11 +89,51 @@ class Simulator:
                           + (self.u_curr[i,j+1] - 2*self.u_curr[i,j] + self.u_curr[i,j-1])/self.parameter.dy**2
                 self.u_next[i,j] = 2*self.u_curr[i,j] - self.u_prev[i,j] + (self.c[i,j]*self.dt)**2 * laplacian
 
-        # 吸收边界条件（二维Mur边界）
-        self.u_next[0, :] = self.alpha * self.u_curr[1, :]    # 左边界
-        self.u_next[-1, :] = self.alpha * self.u_curr[-2, :]  # 右边界
-        self.u_next[:, 0] = self.alpha * self.u_curr[:, 1]    # 下边界
-        self.u_next[:, -1] = self.alpha * self.u_curr[:, -2]  # 上边界
+        # 全透射边界条件（一阶Mur边界）
+        # 左边界
+        self.u_next[0, 1:-1] = self.u_curr[1, 1:-1] + \
+                             (self.c_max*self.dt - self.parameter.dx)/(self.c_max*self.dt + self.parameter.dx) * \
+                             (self.u_next[1, 1:-1] - self.u_curr[0, 1:-1])
+        
+        # 右边界
+        self.u_next[-1, 1:-1] = self.u_curr[-2, 1:-1] + \
+                              (self.c_max*self.dt - self.parameter.dx)/(self.c_max*self.dt + self.parameter.dx) * \
+                              (self.u_next[-2, 1:-1] - self.u_curr[-1, 1:-1])
+        
+        # 下边界
+        self.u_next[1:-1, 0] = self.u_curr[1:-1, 1] + \
+                             (self.c_max*self.dt - self.parameter.dy)/(self.c_max*self.dt + self.parameter.dy) * \
+                             (self.u_next[1:-1, 1] - self.u_curr[1:-1, 0])
+        
+        # 上边界
+        self.u_next[1:-1, -1] = self.u_curr[1:-1, -2] + \
+                              (self.c_max*self.dt - self.parameter.dy)/(self.c_max*self.dt + self.parameter.dy) * \
+                              (self.u_next[1:-1, -2] - self.u_curr[1:-1, -1])
+        
+        # 处理四个角落点
+        # 左下角
+        self.u_next[0, 0] = self.u_curr[1, 1] + \
+                         (self.c_max*self.dt - np.sqrt(self.parameter.dx**2 + self.parameter.dy**2))/ \
+                         (self.c_max*self.dt + np.sqrt(self.parameter.dx**2 + self.parameter.dy**2)) * \
+                         (self.u_next[1, 1] - self.u_curr[0, 0])
+        
+        # 右下角
+        self.u_next[-1, 0] = self.u_curr[-2, 1] + \
+                          (self.c_max*self.dt - np.sqrt(self.parameter.dx**2 + self.parameter.dy**2))/ \
+                          (self.c_max*self.dt + np.sqrt(self.parameter.dx**2 + self.parameter.dy**2)) * \
+                          (self.u_next[-2, 1] - self.u_curr[-1, 0])
+        
+        # 左上角
+        self.u_next[0, -1] = self.u_curr[1, -2] + \
+                          (self.c_max*self.dt - np.sqrt(self.parameter.dx**2 + self.parameter.dy**2))/ \
+                          (self.c_max*self.dt + np.sqrt(self.parameter.dx**2 + self.parameter.dy**2)) * \
+                          (self.u_next[1, -2] - self.u_curr[0, -1])
+        
+        # 右上角
+        self.u_next[-1, -1] = self.u_curr[-2, -2] + \
+                           (self.c_max*self.dt - np.sqrt(self.parameter.dx**2 + self.parameter.dy**2))/ \
+                           (self.c_max*self.dt + np.sqrt(self.parameter.dx**2 + self.parameter.dy**2)) * \
+                           (self.u_next[-2, -2] - self.u_curr[-1, -1])
 
         # 施加声源
         if frame < len(self.source) and self.source_active:
