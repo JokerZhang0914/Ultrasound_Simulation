@@ -22,8 +22,9 @@ class Parameter:
         })
 
     def add_region(self, start_pos_x, end_pos_x, start_pos_y, end_pos_y, ratio):
-        """添加一个新的声阻抗区域"""
+        """添加一个新的矩形声阻抗区域"""
         self.regions.append({
+            'type': 'rectangle',
             'start_pos_x': start_pos_x,
             'end_pos_x': end_pos_x,
             'start_pos_y': start_pos_y,
@@ -31,15 +32,67 @@ class Parameter:
             'ratio': ratio
         })
 
+    def add_circle(self, center_x, center_y, radius, ratio):
+        """添加一个圆形声阻抗区域
+        
+        参数:
+            center_x: 圆心x坐标
+            center_y: 圆心y坐标
+            radius: 圆的半径
+            ratio: 声速比率
+        """
+        self.regions.append({
+            'type': 'circle',
+            'center_x': center_x,
+            'center_y': center_y,
+            'radius': radius,
+            'ratio': ratio
+        })
+
+    def add_ring(self, center_x, center_y, inner_radius, outer_radius, ratio):
+        """添加一个圆环形声阻抗区域
+        
+        参数:
+            center_x: 圆心x坐标
+            center_y: 圆心y坐标
+            inner_radius: 内圆半径
+            outer_radius: 外圆半径
+            ratio: 声速比率
+        """
+        self.regions.append({
+            'type': 'ring',
+            'center_x': center_x,
+            'center_y': center_y,
+            'inner_radius': inner_radius,
+            'outer_radius': outer_radius,
+            'ratio': ratio
+        })
+
     def get_speed(self):
         """生成声速分布数组"""
         c = np.full((self.nx, self.ny), self.base_speed)
+        x = np.arange(self.nx) * self.dx
+        y = np.arange(self.ny) * self.dy
+        X, Y = np.meshgrid(x, y, indexing='ij')
+        
         for region in self.regions:
-            x_start = int(region['start_pos_x'] / self.dx)
-            x_end = int(region['end_pos_x'] / self.dx)
-            y_start = int(region['start_pos_y'] / self.dy)
-            y_end = int(region['end_pos_y'] / self.dy)
-            c[x_start:x_end, y_start:y_end] = self.base_speed * region['ratio']
+            if region['type'] == 'rectangle':
+                x_start = int(region['start_pos_x'] / self.dx)
+                x_end = int(region['end_pos_x'] / self.dx)
+                y_start = int(region['start_pos_y'] / self.dy)
+                y_end = int(region['end_pos_y'] / self.dy)
+                c[x_start:x_end, y_start:y_end] = self.base_speed * region['ratio']
+            
+            elif region['type'] == 'circle':
+                distance = np.sqrt((X - region['center_x'])**2 + (Y - region['center_y'])**2)
+                mask = distance <= region['radius']
+                c[mask] = self.base_speed * region['ratio']
+            
+            elif region['type'] == 'ring':
+                distance = np.sqrt((X - region['center_x'])**2 + (Y - region['center_y'])**2)
+                mask = (distance >= region['inner_radius']) & (distance <= region['outer_radius'])
+                c[mask] = self.base_speed * region['ratio']
+        
         return c
 
 class Simulator:
@@ -152,26 +205,62 @@ class Simulator:
 class Display:
     def __init__(self, simulation):
         self.simulation = simulation
-        self.fig = plt.figure(figsize=(8,6))
-        self.im = plt.imshow(simulation.u_curr.T, cmap='coolwarm', origin='lower',
+        self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # 波场显示
+        self.im = self.ax1.imshow(simulation.u_curr.T, cmap='coolwarm', origin='lower',
                             extent=[0, simulation.parameter.Lx, 0, simulation.parameter.Ly],
                             vmin=-0.5, vmax=0.5)
-        plt.colorbar(label='Wave Amplitude')
-        plt.title('2D Ultrasound Wave Propagation')
+        self.ax1.set_title('2D Ultrasound Wave Propagation')
+        plt.colorbar(self.im, ax=self.ax1, label='Wave Amplitude')
+        
+        # 声阻抗分布显示
+        c_ratio = simulation.c / simulation.parameter.base_speed
+        self.im2 = self.ax2.imshow(c_ratio.T, cmap='viridis', origin='lower',
+                                  extent=[0, simulation.parameter.Lx, 0, simulation.parameter.Ly])
+        self.ax2.set_title('Sound Speed Ratio')
+        plt.colorbar(self.im2, ax=self.ax2, label='(c/c0)')
+        
+        # 添加标注
+        for region in simulation.parameter.regions:
+            if region['type'] == 'rectangle':
+                rect = plt.Rectangle((region['start_pos_x'], region['start_pos_y']),
+                                   region['end_pos_x'] - region['start_pos_x'],
+                                   region['end_pos_y'] - region['start_pos_y'],
+                                   fill=False, color='red', linestyle='--')
+                self.ax2.add_patch(rect)
+            elif region['type'] == 'circle':
+                circle = plt.Circle((region['center_x'], region['center_y']),
+                                  region['radius'], fill=False, color='red', linestyle='--')
+                self.ax2.add_patch(circle)
+            elif region['type'] == 'ring':
+                outer = plt.Circle((region['center_x'], region['center_y']),
+                                 region['outer_radius'], fill=False, color='red', linestyle='--')
+                inner = plt.Circle((region['center_x'], region['center_y']),
+                                 region['inner_radius'], fill=False, color='red', linestyle='--')
+                self.ax2.add_patch(outer)
+                self.ax2.add_patch(inner)
 
     def update(self, frame):
         """更新动画"""
         self.simulation.update(frame)
         self.im.set_data(self.simulation.u_curr.T)
-        return [self.im]
+        return [self.im, self.im2]
 
 def main():
     # 创建参数对象
     parameter = Parameter(Lx=0.02, Ly=0.02, nx=200, ny=200)
     
-    # 添加声阻抗区域
+    # 添加矩形声阻抗区域
     parameter.add_region(start_pos_x=0.015, end_pos_x=0.018,
                         start_pos_y=0, end_pos_y=0.02, ratio=0.6)
+    
+    # 添加圆形声阻抗区域
+    parameter.add_circle(center_x=0.01, center_y=0.01, radius=0.003, ratio=0.8)
+    
+    # 添加圆环形声阻抗区域
+    parameter.add_ring(center_x=0.01, center_y=0.015,
+                      inner_radius=0.002, outer_radius=0.004, ratio=1.2)
     
     # 添加多个声源
     parameter.add_source(pos_x=0.002, pos_y=0.004)  # 左下角声源

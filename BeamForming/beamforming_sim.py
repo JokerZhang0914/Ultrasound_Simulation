@@ -82,7 +82,7 @@ class Parameter:
         return c
 
 class BeamformingSimulator:
-    def __init__(self, parameter, array_transducer):
+    def __init__(self, parameter, array_transducer, emission_mode='single'):
         # 仿真参数
         self.parameter = parameter
         self.array_transducer = array_transducer
@@ -103,9 +103,11 @@ class BeamformingSimulator:
         self.u_prev = self.u_curr.copy()
         self.u_next = self.u_curr.copy()
         
-        # 生成声源
+        # 发射模式设置
+        self.emission_mode = emission_mode  # 'single'为单次发射，'continuous'为连续发射
         self.source_active = True
         self.source = self._generate_source()
+        self.source_period = len(self.source)  # 声源周期
         
         # 边界条件参数
         self.c_max = np.max(self.c)  # 最大声速，用于边界条件计算
@@ -173,21 +175,28 @@ class BeamformingSimulator:
                            (self.u_next[-2, -2] - self.u_curr[-1, -1])
 
         # 施加延迟声源
-        if frame < len(self.source) and self.source_active:
-            for i, pos in enumerate(self.array_transducer.positions):
-                # 计算延迟后的帧索引
-                delayed_frame = frame - int(self.array_transducer.delays[i] / self.dt)
-                if delayed_frame >= 0 and delayed_frame < len(self.source):
-                    x = int(pos[0] / self.parameter.dx)
-                    y = int(pos[1] / self.parameter.dy)
-                    # 应用方向性和加权系数
-                    amplitude = self.source[delayed_frame] * \
-                               self.array_transducer.directivity[i] * \
-                               self.array_transducer.weights[i]
-                    self.u_next[x, y] += amplitude
-        
-        if frame == len(self.source) - 1:
-            self.source_active = False
+        if self.source_active:
+            # 根据发射模式处理声源
+            if self.emission_mode == 'continuous':
+                current_frame = frame % self.source_period
+            else:  # 单次发射模式
+                current_frame = frame
+                if frame >= self.source_period:
+                    self.source_active = False
+                    current_frame = -1  # 确保不会激发声源
+            
+            if current_frame >= 0:
+                for i, pos in enumerate(self.array_transducer.positions):
+                    # 计算延迟后的帧索引
+                    delayed_frame = current_frame - int(self.array_transducer.delays[i] / self.dt)
+                    if delayed_frame >= 0 and delayed_frame < self.source_period:
+                        x = int(pos[0] / self.parameter.dx)
+                        y = int(pos[1] / self.parameter.dy)
+                        # 应用方向性和加权系数
+                        amplitude = self.source[delayed_frame] * \
+                                   self.array_transducer.directivity[i] * \
+                                   self.array_transducer.weights[i]
+                        self.u_next[x, y] += amplitude
 
         # 更新波场
         self.u_prev[:] = self.u_curr
@@ -232,8 +241,13 @@ def main():
     focus_point = np.array([0.01, 0.01])  # 聚焦点位置在阵列下方中心区域
     array_transducer.calculate_delays(focus_point)
 
+    # 选择发射模式 ('single'为单次发射，'continuous'为连续发射)
+    emission_mode = input("请选择发射模式 (0为单次发射，1为连续发射): ") or '0'
+    emission_mode = 'single' if emission_mode == '0' else 'continuous' 
+     # 可以修改为'continuous'进行连续发射
+
     # 创建仿真对象
-    simulation = BeamformingSimulator(parameter, array_transducer)
+    simulation = BeamformingSimulator(parameter, array_transducer, emission_mode=emission_mode)
 
     # 创建显示对象
     display = Display(simulation)
