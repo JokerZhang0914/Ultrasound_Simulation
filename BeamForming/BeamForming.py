@@ -137,7 +137,7 @@ class Parameter:
             c[x_start:x_end, y_start:y_end] = self.base_speed * region['ratio']
         return c
 
-class BeamformingSimulator:
+class Simulator:
     def __init__(self, parameter, array_transducer, emission_mode='single'):
         # 仿真参数
         self.parameter = parameter
@@ -309,7 +309,7 @@ class Display_static:
     def __init__(self, simulation, focus_point, target_time):
         """初始化静态显示对象
         Args:
-            simulation: BeamformingSimulator对象
+            simulation: Simulator对象
             focus_point: 聚焦点坐标
             target_time: 目标时间点（单位：微秒）
         """

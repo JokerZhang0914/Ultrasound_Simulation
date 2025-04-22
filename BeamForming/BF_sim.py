@@ -1,4 +1,4 @@
-from BeamForming import Parameter, ArrayTransducer, BeamformingSimulator, Display, Display_static
+from BeamForming import Parameter, ArrayTransducer, Simulator, Display, Display_static
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -10,7 +10,10 @@ def main():
     # 选择显示模式
     display_mode = input("请选择显示模式 (0为动态显示，1为静态显示): ") or '0'
     display_mode = '0' if display_mode not in ['0', '1'] else display_mode
-    
+    """
+    TODO:模式3：波束扫描。实现聚焦点在一定y值上x值逐渐变化，得到声波传播相同且适当时间后的波长图，将这些波长图逐帧展示，实现波束扫描效果。
+    难点：当前功能2设置显示时间后，计算所需时间过长。
+    """
     # 选择阵列类型
     if display_mode == '1':
         array_type = 'curved'
@@ -40,7 +43,7 @@ def main():
         emission_mode = 'continuous' if emission_mode == '1' else '0'
         
         # 创建仿真对象
-        simulation = BeamformingSimulator(parameter, array_transducer, emission_mode=emission_mode)
+        simulation = Simulator(parameter, array_transducer, emission_mode=emission_mode)
         
         # 动态显示
         display = Display(simulation, focus_point)
@@ -49,7 +52,7 @@ def main():
     else:
         # 静态显示模式
         # 创建仿真对象（静态显示只需单次发射）
-        simulation = BeamformingSimulator(parameter, array_transducer, emission_mode='continuous')
+        simulation = Simulator(parameter, array_transducer, emission_mode='continuous')
         
         target_time = float(input("请输入要显示的时间点（单位：微秒）: "))
         display = Display_static(simulation, focus_point, target_time)
