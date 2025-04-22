@@ -26,28 +26,59 @@ class ArrayTransducer:
             for i in range(self.num_elements):
                 self.positions[i] = [start_x + i * self.element_pitch, y_pos]
         else:  # 弧形阵列
-            if self.radius is None:
-                # 如果未指定半径，设置一个默认值（例如总宽度的2倍）
-                self.radius = total_width * 2
+            # 初始化中心阵元位置
+            center_element_idx = self.num_elements // 2
+            center_x = self.Lx / 2
+            center_y = y_pos
+            self.positions[center_element_idx] = [center_x, center_y]
             
             # 计算弧形阵列的参数
-            # 计算弧度范围
-            total_angle = 2 * np.arcsin(total_width / (2 * self.radius))
+            total_angle = 2 * np.arcsin(total_width / (2 * total_width * 2))  # 使用固定的弧度范围
             angle_step = total_angle / (self.num_elements - 1)
             start_angle = -total_angle / 2
             
-            # 计算阵元在弧上的位置
-            center_x = self.Lx / 2
-            center_y = y_pos + self.radius
-            
+            # 计算其他阵元的位置
             for i in range(self.num_elements):
-                angle = start_angle + i * angle_step
-                x = center_x + self.radius * np.sin(angle)
-                y = center_y - self.radius * np.cos(angle)
-                self.positions[i] = [x, y]
+                if i != center_element_idx:
+                    angle = start_angle + i * angle_step
+                    x = center_x + total_width * np.sin(angle)
+                    y = center_y + total_width * (1 - np.cos(angle))
+                    self.positions[i] = [x, y]
 
     def calculate_delays(self, focus_point):
-        """计算聚焦延迟，考虑阵元方向性和加权"""
+        """计算聚焦延迟，考虑阵元方向性和加权，并动态调整弧形阵列位置"""
+        if self.array_type == 'curved':
+            # 获取中心阵元位置
+            center_element_idx = self.num_elements // 2
+            center_pos = self.positions[center_element_idx].copy()
+            
+            # 计算从中心阵元到聚焦点的方向向量
+            direction = focus_point - center_pos
+            direction_norm = np.sqrt(np.sum(direction**2))
+            direction = direction / direction_norm
+            
+            # 计算圆心位置（在中心阵元背后）
+            total_width = (self.num_elements - 1) * self.element_pitch
+            radius = total_width * 2  # 使用固定的半径
+            circle_center = center_pos - direction * radius
+            
+            # 计算旋转角度范围
+            total_angle = 2 * np.arcsin(total_width / (2 * radius))
+            angle_step = total_angle / (self.num_elements - 1)
+            start_angle = -total_angle / 2
+            
+            # 计算旋转轴（垂直于方向向量的单位向量）
+            rotation_axis = np.array([-direction[1], direction[0]])
+            
+            # 更新所有阵元位置
+            for i in range(self.num_elements):
+                if i != center_element_idx:
+                    angle = start_angle + i * angle_step
+                    # 使用旋转矩阵计算新位置
+                    rot_direction = direction * np.cos(angle) + rotation_axis * np.sin(angle)
+                    self.positions[i] = circle_center + radius * rot_direction
+        
+        # 计算声波参数
         c = 1500.0  # 声速 (m/s)
         wavelength = c / 2.5e6  # 波长 (对应2.5MHz频率)
         k = 2 * np.pi / wavelength  # 波数
@@ -228,7 +259,7 @@ class BeamformingSimulator:
         self.u_curr[:] = self.u_next
 
 class Display:
-    def __init__(self, simulation):
+    def __init__(self, simulation, focus_point):
         self.simulation = simulation
         self.fig = plt.figure(figsize=(8,6))
         self.ax = plt.gca()
@@ -241,11 +272,8 @@ class Display:
         # 获取聚焦点位置（保存为类属性以便在update中使用）
         self.center_element_idx = len(simulation.array_transducer.positions) // 2
         self.center_pos = simulation.array_transducer.positions[self.center_element_idx]
-        # 根据阵列类型设置聚焦点
-        if simulation.array_transducer.array_type == 'linear':
-            self.focus_point = np.array([0.005, 0.01])  # 线性阵列聚焦点
-        else:
-            self.focus_point = np.array([simulation.parameter.Lx/2, 0.01])  # 弧形阵列聚焦点在中心线上
+        # 设置聚焦点位置
+        self.focus_point = focus_point  # 聚焦点位置
         
         # 创建图例句柄
         self.scatter_handle = None
@@ -287,7 +315,7 @@ def main():
     
     # 创建换能器阵列
     array_transducer = ArrayTransducer(
-        num_elements=32,  # 32个阵元
+        num_elements=16,  # 32个阵元
         element_pitch=0.0002,  # 阵元间距0.2mm
         element_width=0.0001,  # 阵元宽度0.1mm
         Lx=parameter.Lx,  # 仿真区域宽度
@@ -297,10 +325,10 @@ def main():
     )
     
     # 设置聚焦点
-    if array_type == 'linear':
-        focus_point = np.array([0.005, 0.01])  # 线性阵列聚焦点
-    else:
-        focus_point = np.array([parameter.Lx/2, 0.01])  # 弧形阵列聚焦点在中心线上
+    # print(f"\n请输入聚焦点坐标（默认值：x={parameter.Lx/2}，y=0.01）：")
+    # focus_x = float(input(f"x坐标 (0-{parameter.Lx}): ") or str(parameter.Lx/2))
+    # focus_y = float(input("y坐标 (0-{parameter.Ly}): ") or "0.01")
+    focus_point = np.array([0.01, 0.0025])
     array_transducer.calculate_delays(focus_point)
 
     # 选择发射模式 ('single'为单次发射，'continuous'为连续发射)
@@ -311,7 +339,7 @@ def main():
     simulation = BeamformingSimulator(parameter, array_transducer, emission_mode=emission_mode)
 
     # 创建显示对象
-    display = Display(simulation)
+    display = Display(simulation, focus_point)
 
     # 创建动画
     ani = FuncAnimation(display.fig, display.update,
