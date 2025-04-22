@@ -231,23 +231,51 @@ class Display:
     def __init__(self, simulation):
         self.simulation = simulation
         self.fig = plt.figure(figsize=(8,6))
+        self.ax = plt.gca()
         self.im = plt.imshow(simulation.u_curr.T, cmap='coolwarm', origin='lower',
                             extent=[0, simulation.parameter.Lx, 0, simulation.parameter.Ly],
                             vmin=-0.5, vmax=0.5)
         plt.colorbar(label='Wave Amplitude')
         plt.title('Ultrasound Beamforming Simulation')
-
-        # 绘制换能器阵元位置
-        plt.scatter(simulation.array_transducer.positions[:, 0],
-                   simulation.array_transducer.positions[:, 1],
-                   c='white', marker='s', s=50, label='Transducer Elements')
-        plt.legend()
+        
+        # 获取聚焦点位置（保存为类属性以便在update中使用）
+        self.center_element_idx = len(simulation.array_transducer.positions) // 2
+        self.center_pos = simulation.array_transducer.positions[self.center_element_idx]
+        # 根据阵列类型设置聚焦点
+        if simulation.array_transducer.array_type == 'linear':
+            self.focus_point = np.array([0.005, 0.01])  # 线性阵列聚焦点
+        else:
+            self.focus_point = np.array([simulation.parameter.Lx/2, 0.01])  # 弧形阵列聚焦点在中心线上
+        
+        # 创建图例句柄
+        self.scatter_handle = None
+        self.line_handle = None
 
     def update(self, frame):
         """更新动画"""
         self.simulation.update(frame)
         self.im.set_data(self.simulation.u_curr.T)
-        return [self.im]
+        
+        # 移除之前的散点图和连接线（如果存在）
+        if self.scatter_handle:
+            self.scatter_handle.remove()
+        if self.line_handle:
+            self.line_handle.remove()
+        
+        # 重新绘制换能器阵元位置
+        self.scatter_handle = self.ax.scatter(self.simulation.array_transducer.positions[:, 0],
+                                             self.simulation.array_transducer.positions[:, 1],
+                                             c='black', marker='o', s=1, label='Transducer Elements', zorder=10)
+        
+        # 重新绘制从中心阵元到聚焦点的连接线
+        self.line_handle, = self.ax.plot([self.center_pos[0], self.focus_point[0]], 
+                                        [self.center_pos[1], self.focus_point[1]], 
+                                        'green', linewidth=3, label='Focus Line', zorder=10)
+        
+        # 更新图例
+        self.ax.legend()
+        
+        return [self.im, self.scatter_handle, self.line_handle]
 
 def main():
     # 创建参数对象
@@ -270,7 +298,7 @@ def main():
     
     # 设置聚焦点
     if array_type == 'linear':
-        focus_point = np.array([0.01, 0.01])  # 线性阵列聚焦点
+        focus_point = np.array([0.005, 0.01])  # 线性阵列聚焦点
     else:
         focus_point = np.array([parameter.Lx/2, 0.01])  # 弧形阵列聚焦点在中心线上
     array_transducer.calculate_delays(focus_point)
