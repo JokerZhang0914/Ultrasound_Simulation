@@ -325,9 +325,6 @@ def main():
     )
     
     # 设置聚焦点
-    # print(f"\n请输入聚焦点坐标（默认值：x={parameter.Lx/2}，y=0.01）：")
-    # focus_x = float(input(f"x坐标 (0-{parameter.Lx}): ") or str(parameter.Lx/2))
-    # focus_y = float(input("y坐标 (0-{parameter.Ly}): ") or "0.01")
     focus_point = np.array([0.01, 0.0025])
     array_transducer.calculate_delays(focus_point)
 
