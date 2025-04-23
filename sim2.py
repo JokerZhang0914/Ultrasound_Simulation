@@ -253,18 +253,18 @@ def main():
     
     # 添加矩形声阻抗区域
     parameter.add_region(start_pos_x=0.015, end_pos_x=0.018,
-                        start_pos_y=0, end_pos_y=0.02, ratio=0.6)
+                        start_pos_y=0, end_pos_y=0.02, ratio=0.8)
     
     # 添加圆形声阻抗区域
-    parameter.add_circle(center_x=0.01, center_y=0.01, radius=0.003, ratio=0.8)
+    parameter.add_circle(center_x=0.01, center_y=0.01, radius=0.003, ratio=1.2)
     
     # 添加圆环形声阻抗区域
     parameter.add_ring(center_x=0.01, center_y=0.015,
-                      inner_radius=0.002, outer_radius=0.004, ratio=1.2)
+                      inner_radius=0.002, outer_radius=0.004, ratio=0.9)
     
     # 添加多个声源
-    parameter.add_source(pos_x=0.002, pos_y=0.004)  # 左下角声源
-    parameter.add_source(pos_x=0.016, pos_y=0.016)  # 右上角声源
+    parameter.add_source(pos_x=0.005, pos_y=0.005)  # 左下角声源
+    parameter.add_source(pos_x=0.015, pos_y=0.015)  # 右上角声源
     parameter.add_source(pos_x=0.01, pos_y=0.01)    # 中心声源
 
     # 创建仿真对象

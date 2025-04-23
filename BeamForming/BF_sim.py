@@ -19,7 +19,7 @@ def main():
         array_type = 'curved'
     else:
         array_type = input("请选择阵列类型 (0为线性阵列，1为弧形阵列): ") or '0'
-        array_type = 'curved' if array_type == '1' else '0'
+        array_type = 'curved' if array_type == '1' else 'linear'
     
     
     # 创建换能器阵列
@@ -34,7 +34,7 @@ def main():
     )
     
     # 设置聚焦点
-    focus_point = np.array([0.01, 0.0025])
+    focus_point = np.array([0.01, 0.01])
     array_transducer.calculate_delays(focus_point)
 
     if display_mode == '0':

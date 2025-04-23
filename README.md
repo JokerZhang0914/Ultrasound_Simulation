@@ -20,7 +20,7 @@ Medical ultrasound simulation platform with three main functions:
 
 ## Installation
 ```bash
-pip install numpy matplotlib
+pip install numpy matplotlib scipy
 ```
 
 ## Usage
@@ -62,7 +62,7 @@ python sim2.py
     - 可添加矩形、圆形、椭圆形区域，设置不同声速模拟不同介质
 ## 安装
 ```bash
-pip install numpy matplotlib
+pip install numpy matplotlib scipy
 ```
 
 ## 使用说明

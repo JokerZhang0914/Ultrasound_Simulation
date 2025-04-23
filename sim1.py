@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from scipy.signal import hilbert,find_peaks
 
 class Parameter:
     def __init__(self, length, nx):
@@ -46,19 +47,17 @@ class Receiver:
 
     def get_envelope(self):
         """使用Hilbert变换计算信号包络"""
-        from scipy.signal import hilbert
         analytic_signal = hilbert(self.received_signal)
         self.envelope = np.abs(analytic_signal)
         return self.envelope
 
     def analyze_impedance(self):
-        """分析声阻抗变化"""
+        """分析包络寻找峰值"""
         if self.envelope is None:
             self.get_envelope()
         
         # 找到包络的峰值
-        from scipy.signal import find_peaks
-        peaks, _ = find_peaks(self.envelope, height=0.1)
+        peaks, _ = find_peaks(self.envelope, height=0.01)
         
         # 计算峰值对应的时间和位置
         time_axis = np.linspace(0, len(self.received_signal) * self.parameter.dx / self.parameter.base_speed, len(self.received_signal))
@@ -146,7 +145,7 @@ class Display:
     def setup_plots_mode1(self):
         """设置模式1的绘图对象（波长与接收动态显示）"""
         self.fig, (self.ax2, self.ax1, self.ax3) = plt.subplots(3, 1, 
-            height_ratios=[0.8, 3, 1], figsize=(10, 12))
+            height_ratios=[0.6, 3, 1], figsize=(10, 12))
         
         # 声速分布图
         c_ratio = self.simulation.c / self.simulation.parameter.base_speed
@@ -206,10 +205,10 @@ class Display:
         self.line_envelope.set_data(time_axis, envelope[:valid_frames])
         
         # 分析声阻抗变化
-        if self.receiver.total_frame_count % self.simulation.nt == 0:
-            positions, amplitudes = self.receiver.analyze_impedance()
-            print("\n声阻抗变化位置 (m):", positions)
-            print("相对幅度:", amplitudes)
+        # if self.receiver.total_frame_count % self.simulation.nt == 0:
+        #     positions, amplitudes = self.receiver.analyze_impedance()
+        #     print("\n声阻抗变化位置 (m):", positions)
+        #     print("相对幅度:", amplitudes)
         
         self.ax3.set_xlim(0, self.receiver.max_periods * self.simulation.t_end*1e6)
         self.ax3.set_ylim(-1.5, 1.5)
@@ -238,7 +237,7 @@ class Display:
         
         # 标注峰值
         from scipy.signal import find_peaks
-        peaks, _ = find_peaks(envelope[:frames], height=0.1)
+        peaks, _ = find_peaks(envelope[:frames], height=0.075)
         peak_times = time_axis[peaks]
         peak_values = envelope[peaks]
         
@@ -256,13 +255,14 @@ class Display:
 def main():
     # 创建声阻抗分布对象
     parameter = Parameter(length=0.05, nx=1500)
-    parameter.add_region(start_pos=0.01, end_pos=0.02, ratio=0.6)
+    parameter.add_region(start_pos=0.01, end_pos=0.02, ratio=0.8)
+    parameter.add_region(start_pos=0.03, end_pos=0.04, ratio=1.2)
 
     # 创建仿真对象
     simulation = Simulator(parameter)
 
     # 创建接收器
-    receiver = Receiver(simulation.nt, max_periods=5, receiver_pos=0.0, parameter=parameter)
+    receiver = Receiver(simulation.nt, max_periods=10, receiver_pos=0.0, parameter=parameter)
 
     # 选择显示模式（1：波长与接收动态显示，2：接收信号包络波形）
     mode = int(input("请选择显示模式（1：波场与接收动态显示，2：接收信号波形）："))
